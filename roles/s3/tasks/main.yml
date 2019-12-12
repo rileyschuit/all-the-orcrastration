@@ -1,0 +1,9 @@
+---
+# - aws_s3_bucket_facts:
+
+- name: Create
+  s3_bucket:
+    name: "{{ item.value.bucket_name }}"
+    state: "{{ item.value.state | default('present') }}"
+    policy: "{{ item.value.policy_details | default(omit) }}"
+  with_dict: "{{ s3_buckets }}"
