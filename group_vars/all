@@ -20,3 +20,5 @@ s3_buckets:
       }
   rileyschuit_com_buildbucket:
     bucket_name: rileyschuit.com-buildbucket
+  rileyschuit_test_bucket:
+    bucket_name: rileyschuit-test-bucket
