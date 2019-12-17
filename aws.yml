@@ -1,7 +1,0 @@
----
-- name: Configure needed AWS resources
-  hosts: localhost
-  gather_facts: False
-
-  roles:
-    - s3

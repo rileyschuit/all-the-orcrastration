@@ -1,0 +1,61 @@
+---
+
+- name: Create VPC
+  ec2_vpc_net:
+    name: "{{ item.name }}"
+    cidr_block: "{{ item.cidr_block }}"
+    region: "{{ item.region }}"
+    tags: "{{ item.tags }}"
+  register: create_vpc
+  with_items: "{{ vpc }}"
+
+- name: set fact so subnet creation actually works
+  set_fact:
+    subnets_to_build: "{{ subnets_to_build }} + [
+        {% for creation in create_vpc.results %}
+          {% for subnet in creation.item.subnets %}
+          {
+            'vpc_id': '{{ creation.vpc.id }}',
+            'az': '{{ subnet.az }}',
+            'subnet': '{{ subnet.subnet }}',
+            'region': '{{ creation.item.region }}',
+            'tags': {{ creation.item.tags }}
+          },
+          {% endfor %}
+        {% endfor %}
+      ]"
+
+- name: Subnet
+  ec2_vpc_subnet:
+    state: present
+    vpc_id: "{{ item.vpc_id }}"
+    cidr: "{{ item.subnet }}"
+    resource_tags: "{{ item.tags }}"
+    region: "{{ item.region }}"
+    az: "{{ item.az }}"
+    tags: "{{ item.tags }}"
+  register: subnet
+  with_items: "{{ subnets_to_build }}"
+
+- name: IGW
+  ec2_vpc_igw:
+    vpc_id: "{{ item.vpc.id }}"
+    state: present
+    region: us-east-1
+    resource_tags:
+      Name: Development-Stage-IGW
+  register: igw
+  with_items: "{{ create_vpc.results }}"
+  when: item.item.igw
+
+- name: Security group - Stateful FW
+  ec2_group:
+    # GROUP NAME
+    name: "{{ item.item.name }} Security Group"
+    description: "{{ item.item.name }} Security group"
+    vpc_id: "{{ item.vpc.id }}"
+    region: "{{ item.item.region }}"
+    tags: "{{ item.item.tags }}"
+    rules: "{{ item.item.sec_group }}"
+  with_items: "{{ create_vpc.results }}"
+  register: security_group_creation
