@@ -1,0 +1,72 @@
+---
+- name: debug vpc creation
+  debug:
+    msg: "{{ subnet_creation }}"
+
+- name: Lay out list for successful ec2 generation
+  set_fact:
+    ec2_creation_facts: "{{ ec2_creation_facts }} + [
+        {% for app in ec2 %}
+          {% for creation in app.locations %}
+            {
+              'tags': {{ app.tags }},
+              'location': '{{ creation.az }}',
+              'ami': '{{ creation.image }}',
+              {% for subnet_detail in subnet_creation.results %}
+                {% if subnet_detail.subnet.availability_zone == creation.az %}
+                  'subnet_id': '{{ subnet_detail.subnet.id }}',
+                  'vpc_id': '{{ subnet_detail.subnet.vpc_id}}',
+                  'region': '{{ subnet_detail.item.region }}',
+                  {% for sg_result in security_group_creation.results %}
+                    {% if app.stage_vpc in sg_result.group_name %}
+                      'sg_id': '{{ sg_result.group_id }}'
+                    {% endif %}
+                  {% endfor %}
+                {% endif %}
+              {% endfor %}
+            },
+          {% endfor %}
+        {% endfor %}
+      ]"
+
+- name: debug
+  debug:
+    msg: "{{ ec2_creation_facts }}"
+
+# - name: debug
+#   debug:
+#     msg: "{{ security_group_creation.results }}"
+
+- name: Create Instance when prompted password is given
+  ec2:
+    wait: true
+    instance_type:
+    region: "{{ item.region }}"
+    image: "{{ item.ami }}"
+    assign_public_ip: true
+    count: "{{ item.instance_count | default(1) }}"
+    instance_tags: "{{ item.tags }}"
+    vpc_subnet_id: "{{ item.subnet_id }}"
+    group_id: "{{ item.sg_id }}"
+    user_data: |
+       #!/bin/bash
+       sudo useradd {{ appuser }} -s /bin/bash -d /home/{{ appuser }} -m
+       sudo usermod -aG sudo {{ appuser }}
+       sudo echo -e "{{ appuser_pw  }}\n{{ appuser_pw  }}" | sudo passwd {{ appuser }}
+       sudo sed -i "/PasswordAuthentication no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
+       sudo echo '{{ appuser }} ALL=(ALL:ALL) ALL' | sudo EDITOR='tee -a' visudo
+       sudo /etc/init.d/ssh reload
+       sudo apt-get install -y python
+  register: vm_creation
+  with_items: "{{ ec2_creation_facts }}"
+
+    # - name: Add instances into ansible group
+    #   add_host:
+    #     hostname: "{{ item.tagged_instances[0].public_dns_name }}"
+    #     groupname: "{{ item.name }}"
+    #   with_items: "{{ vm_creation.results }}"
+    #
+    # - name: Wait for ssh
+    #   local_action: wait_for port=22 host="{{ item.tagged_instances[0].public_dns_name }}" search_regex=OpenSSH delay=10
+    #   with_items: "{{ vm_creation.results }}"
+    #   when: vm_creation.changed

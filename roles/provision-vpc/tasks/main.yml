@@ -9,6 +9,17 @@
   register: create_vpc
   with_items: "{{ vpc }}"
 
+- name: IGW Creation
+  ec2_vpc_igw:
+    vpc_id: "{{ item.vpc.id }}"
+    state: present
+    region: us-east-1
+    resource_tags:
+      Name: Development-Stage-IGW
+  register: igw
+  with_items: "{{ create_vpc.results }}"
+  when: item.item.igw
+
 - name: set fact so subnet creation actually works
   set_fact:
     subnets_to_build: "{{ subnets_to_build }} + [
@@ -20,37 +31,60 @@
             'subnet': '{{ subnet.subnet }}',
             'region': '{{ creation.item.region }}',
             'tags': {{ creation.item.tags }}
+            {% for gw in igw.results %}
+              {% if creation.vpc.id == gw.vpc_id %}
+                , 'igw': '{{ gw.gateway_id }}'
+              {% endif %}
+            {% endfor %}
           },
           {% endfor %}
         {% endfor %}
       ]"
 
-- name: Subnet
+- name: Subnet Creation
   ec2_vpc_subnet:
     state: present
     vpc_id: "{{ item.vpc_id }}"
     cidr: "{{ item.subnet }}"
-    resource_tags: "{{ item.tags }}"
     region: "{{ item.region }}"
     az: "{{ item.az }}"
     tags: "{{ item.tags }}"
-  register: subnet
+  register: subnet_creation
   with_items: "{{ subnets_to_build }}"
 
-- name: IGW
-  ec2_vpc_igw:
-    vpc_id: "{{ item.vpc.id }}"
-    state: present
-    region: us-east-1
-    resource_tags:
-      Name: Development-Stage-IGW
-  register: igw
-  with_items: "{{ create_vpc.results }}"
-  when: item.item.igw
+# There is probably a better way to do this
+- name: Creation relation of vpc to subnet ID relation for route creation
+  set_fact:
+    routes_to_build: "{{ routes_to_build }} + [
+      {% for igw_detail in igw.results %}
+        {
+          'vpc': '{{ igw_detail.vpc_id }}',
+          'region': '{{ igw_detail.item.item.region }}',
+          'tags': {{ igw_detail.item.item.tags }},
+          'igw': '{{ igw_detail.gateway_id }}',
+          'subnets': [
+            {% for subnet_details in subnet_creation.results %}
+              '{{ subnet_details.subnet.id }}',
+            {% endfor %}
+          ]
+        },
+      {% endfor %}
+    ]"
+
+- name: Add subnets to routing table
+  ec2_vpc_route_table:
+    vpc_id: "{{ item.vpc }}"
+    region: "{{ item.region }}"
+    tags: "{{ item.tags }}"
+    subnets: "{{ item.subnets }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ item.igw }}"
+  register: public_route_table
+  with_items: "{{ routes_to_build }}"
 
 - name: Security group - Stateful FW
   ec2_group:
-    # GROUP NAME
     name: "{{ item.item.name }} Security Group"
     description: "{{ item.item.name }} Security group"
     vpc_id: "{{ item.vpc.id }}"
