@@ -4,7 +4,7 @@
   gather_facts: False
   vars_prompt:
     - name: appuser
-      prompt: "What is the shell username you want[appuser]"
+      prompt: "What is the shell username you want"
       private: no
       when: appuser is not defined
 
@@ -18,4 +18,6 @@
     - provision-vpc
     - provision-s3
     - role: provision-ec2
-      when: appuser_pw != ''
+      when:
+        - appuser != ''
+        - appuser_pw != ''

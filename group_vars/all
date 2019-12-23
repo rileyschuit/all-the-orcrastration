@@ -20,8 +20,6 @@ s3_buckets:
       }
   rileyschuit_com_buildbucket:
     bucket_name: rileyschuit.com-buildbucket
-  rileyschuit_test_bucket:
-    bucket_name: rileyschuit-test-bucket
 
 vpc:
   - name: Development-Stage
@@ -58,7 +56,7 @@ ec2:
     packages:
       - docker
     locations:
-      - { "az": "us-east-1a", "image": "ami-09f9d773751b9d606"}
+      - { "az": "us-east-1a", "image": "ami-09f9d773751b9d606", "desired_count": 1}
       # - { "az": "us-east-1b", "image": "ami-09f9d773751b9d606"}
     tags:
       Environment: Development

@@ -1,27 +1,24 @@
 ---
-- name: debug vpc creation
-  debug:
-    msg: "{{ subnet_creation }}"
+# This will take our dictionary and line it up with the information needed for
+# ec2 creation.  It will then use that same information to check that our
+# instances are running.  If we are missing some, they will be created.
+
+# BUG/TODO: The desired count is including terminated instances
 
 - name: Lay out list for successful ec2 generation
   set_fact:
-    ec2_creation_facts: "{{ ec2_creation_facts }} + [
+    ec2_creation_desires: "{{ ec2_creation_desires }} + [
         {% for app in ec2 %}
           {% for creation in app.locations %}
             {
               'tags': {{ app.tags }},
               'location': '{{ creation.az }}',
               'ami': '{{ creation.image }}',
+              'desired_count': '{{ creation.desired_count | default(1) }}',
               {% for subnet_detail in subnet_creation.results %}
                 {% if subnet_detail.subnet.availability_zone == creation.az %}
                   'subnet_id': '{{ subnet_detail.subnet.id }}',
-                  'vpc_id': '{{ subnet_detail.subnet.vpc_id}}',
-                  'region': '{{ subnet_detail.item.region }}',
-                  {% for sg_result in security_group_creation.results %}
-                    {% if app.stage_vpc in sg_result.group_name %}
-                      'sg_id': '{{ sg_result.group_id }}'
-                    {% endif %}
-                  {% endfor %}
+                  'region': '{{ subnet_detail.item.region }}'
                 {% endif %}
               {% endfor %}
             },
@@ -29,22 +26,55 @@
         {% endfor %}
       ]"
 
-- name: debug
-  debug:
-    msg: "{{ ec2_creation_facts }}"
+- name: Gather ec2 instance facts
+  ec2_instance_info:
+    filters:
+      availability-zone: "{{ item.location }}"
+      image-id: "{{ item.ami }}"
+    region: "{{ item.region }}"
+  with_items: "{{ ec2_creation_desires }}"
+  register: irl_ec2_facts
 
-# - name: debug
-#   debug:
-#     msg: "{{ security_group_creation.results }}"
+- name: Figure out if our instance count is off
+  set_fact:
+    ec2_creation_todo: "{{ ec2_creation_todo }} + [
+        {% for app in ec2 %}
+          {% for irl_ec2 in irl_ec2_facts.results %}
+            {% for creation in app.locations %}
+              {
+                'tags': {{ app.tags }},
+                'location': '{{ creation.az }}',
+                'ami': '{{ creation.image }}',
+                {% for ec2_irl in irl_ec2_facts.results %}
+                  'desired_count': '{{ ec2_irl.item.desired_count|int -
+                      ec2_irl.instances|length|int}}',
+                {% endfor %}
+                {% for subnet_detail in subnet_creation.results %}
+                  {% if subnet_detail.subnet.availability_zone == creation.az %}
+                    'subnet_id': '{{ subnet_detail.subnet.id }}',
+                    'vpc_id': '{{ subnet_detail.subnet.vpc_id}}',
+                    'region': '{{ subnet_detail.item.region }}',
+                    {% for sg_result in security_group_creation.results %}
+                      {% if app.stage_vpc in sg_result.group_name %}
+                        'sg_id': '{{ sg_result.group_id }}'
+                      {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                {% endfor %}
+              },
+            {%endfor %}
+          {% endfor %}
+        {% endfor %}
+      ]"
 
-- name: Create Instance when prompted password is given
+- name: Create Instance(s)
   ec2:
     wait: true
-    instance_type:
+    instance_type: "{{ item.instance_type | default('t2.micro') }}"
     region: "{{ item.region }}"
     image: "{{ item.ami }}"
     assign_public_ip: true
-    count: "{{ item.instance_count | default(1) }}"
+    count: "{{ item.desired_count | default(1) }}"
     instance_tags: "{{ item.tags }}"
     vpc_subnet_id: "{{ item.subnet_id }}"
     group_id: "{{ item.sg_id }}"
@@ -58,15 +88,6 @@
        sudo /etc/init.d/ssh reload
        sudo apt-get install -y python
   register: vm_creation
-  with_items: "{{ ec2_creation_facts }}"
-
-    # - name: Add instances into ansible group
-    #   add_host:
-    #     hostname: "{{ item.tagged_instances[0].public_dns_name }}"
-    #     groupname: "{{ item.name }}"
-    #   with_items: "{{ vm_creation.results }}"
-    #
-    # - name: Wait for ssh
-    #   local_action: wait_for port=22 host="{{ item.tagged_instances[0].public_dns_name }}" search_regex=OpenSSH delay=10
-    #   with_items: "{{ vm_creation.results }}"
-    #   when: vm_creation.changed
+  when:
+    - item.desired_count|int > 0
+  with_items: "{{ ec2_creation_todo }}"
