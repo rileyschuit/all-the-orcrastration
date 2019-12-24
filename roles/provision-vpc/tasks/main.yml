@@ -14,11 +14,11 @@
     vpc_id: "{{ item.vpc.id }}"
     state: present
     region: us-east-1
-    resource_tags:
-      Name: Development-Stage-IGW
+    resource_tags: "{{ item.item.tags }}"
   register: igw
   with_items: "{{ create_vpc.results }}"
-  when: item.item.igw
+  when:
+    - item.item.igw
 
 - name: set fact so subnet creation actually works
   set_fact:
@@ -71,6 +71,7 @@
       {% endfor %}
     ]"
 
+# TODO: Define this with vars
 - name: Add subnets to routing table
   ec2_vpc_route_table:
     vpc_id: "{{ item.vpc }}"
