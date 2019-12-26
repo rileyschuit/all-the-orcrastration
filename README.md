@@ -1,6 +1,6 @@
 ## My Orchestration playbooks and roles
 
-_SUMMARY_: This is an ongoing project to programmatically show/user samples of playbooks for my AWS and local service management in my home.  These playbooks are aimed to be idiot proof.  
+_SUMMARY_: This is an ongoing project to programmatically show/use samples of playbooks for my AWS and local service management in my home.  These playbooks are aimed to be idiot proof.  
 
 Provisioning playbook (Sets up s3, vpc, subnets, routing, security group, ec2).  It will ask you for ec2 credentials for building your instances:  
 ```
@@ -22,7 +22,6 @@ ansible-playbook -i <IF_OF_HOST>, aws-ec2-maintenance.yml --extra-vars "ansible_
 
 ### TODOs:  
 - Make better tasks for VPC ACLs
-- Consider using ansible galaxy to share and pull roles
 - Create nuke option for wiping out whole environment
 - Ignore terminated instances when it comes to counting desired number of instances
-- IAM users, groups
+- OnPrem machine management, once that is figured out - get greengrass going
