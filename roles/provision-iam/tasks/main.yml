@@ -1,7 +1,7 @@
 ---
 - name: Create roles
   iam:
-    iam_type: role
+    iam_type: "{{ item.type }}"
     name: "{{ item.name }}"
     state: "{{ item.state | default('present') }}"
     trust_policy:

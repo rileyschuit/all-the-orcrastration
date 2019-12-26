@@ -1,0 +1,41 @@
+---
+- name: Download rasbian version of ssm
+  get_url:
+    url:  https://s3.region.amazonaws.com/amazon-ssm-region/latest/debian_arm/amazon-ssm-agent.deb
+    dest: /tmp/ssm/amazon-ssm-agent.deb
+    mode: '440'
+
+- name: Install package
+  shell: dpkg -i /tmp/ssm/amazon-ssm-agent.deb
+
+- name: Stop service
+  service:
+    name: amazon-ssm-agent
+    state: stopped
+
+# Work in progress
+# time format: yyyy-mm-ddThh:mm-8:00
+# - name: Create actication codes
+#   shell: >
+#     aws ssm create-activation
+#       --default-instance-name {{ item.name }}
+#       --iam-role {{ role_for_this }}
+#       --registration-limit {{ registration_limit | default(1) }}
+#       --region us-east-1
+#
+# - name: Register machine to ssm
+#   shell: >
+#     amazon-ssm-agent -register
+#       -code "{{ activation_code }}"
+#       -id "{{ activation_id }}"
+#       -region "{{ ssm_region | default('ssm.us-east-1.amazonaws.com') }}"
+
+- name: Start service
+  service:
+    name: amazon-ssm-agent
+    state: started
+
+- name: Enable service amazon-ssm-agent
+  service:
+    name: amazon-ssm-agent
+    enabled: yes
