@@ -84,7 +84,7 @@
        sudo usermod -aG sudo {{ appuser }}
        sudo echo -e "{{ appuser_pw  }}\n{{ appuser_pw  }}" | sudo passwd {{ appuser }}
        sudo sed -i "/PasswordAuthentication no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
-       sudo echo '{{ appuser }} ALL=(ALL:ALL) ALL' | sudo EDITOR='tee -a' visudo
+       sudo echo '{{ appuser }} ALL=(ALL:ALL) NOPASSWD: ALL' | sudo EDITOR='tee -a' visudo
        sudo /etc/init.d/ssh reload
        sudo apt-get install -y python
   register: vm_creation
