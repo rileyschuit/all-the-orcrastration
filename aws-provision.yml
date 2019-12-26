@@ -16,7 +16,8 @@
 
   roles:
     - provision-vpc
-    - provision-s3
+    # - provision-s3
+    - provision-iam
     - role: provision-ec2
       when:
         - appuser != ''

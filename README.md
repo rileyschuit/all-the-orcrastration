@@ -23,4 +23,6 @@ ansible-playbook -i <IF_OF_HOST>, aws-ec2-maintenance.yml --extra-vars "ansible_
 ### TODOs:  
 - Make better tasks for VPC ACLs
 - Consider using ansible galaxy to share and pull roles
-- Create nuke option for wiping out whole environment 
+- Create nuke option for wiping out whole environment
+- Ignore terminated instances when it comes to counting desired number of instances
+- IAM users, groups
