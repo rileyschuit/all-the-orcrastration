@@ -2,7 +2,8 @@
 - name: Package installation and service checks
   hosts: all
   become: True
-  
+
   tasks:
-    - name: Just run uptime for my sanity on SSM
-      shell: uptime
+    - name: Run the equivalent of "apt-get update" as a separate step
+      apt:
+        update_cache: yes
