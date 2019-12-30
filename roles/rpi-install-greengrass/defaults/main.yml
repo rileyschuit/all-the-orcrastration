@@ -1,0 +1,6 @@
+---
+gg_dependdency_checker_version: '1.10.x'
+gg_dependdency_checker_dl_path: "/home/pi/Downloads/greengrass-dependency-checker-GGCv{{ gg_dependdency_checker_version }}"
+gg_src_version: "1.10.0"
+gg_src_link: "https://d1onfpft10uf5o.cloudfront.net/greengrass-core/downloads/{{ gg_src_version }}/greengrass-linux-armv7l-{{ gg_src_version }}.tar.gz"
+gg_src_dl_path: "/home/pi/Downloads/greengrass-linux-armv7l-{{ gg_src_version }}"

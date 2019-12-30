@@ -1,0 +1,121 @@
+---
+- name: populate service facts
+  service_facts:
+
+# FYI Currently only tested on RPi
+- name: Install greengrass if service is not seen
+  when:
+    - '"Debian" in ansible_facts.os_family'
+    - '"arm" in ansible_facts.architecture'
+
+  # Prep cow for slaughter
+  block:
+    - name: debug running state
+      shell: sysctl -a 2> /dev/null | grep fs.protected
+      register: running_state
+
+    - name: Configure security settings
+      block:
+        - name: Improve security
+          lineinfile:
+            path: /etc/sysctl.d/98-rpi.conf
+            line:
+          with_items:
+           - "fs.protected_hardlinks = 1"
+           - "fs.protected_symlinks = 1"
+          register: sec_setting_change
+          when:
+            - '"fs.protected_hardlinks = 1" not in running_state.stdout'
+            - '"fs.protected_symlinks = 1" not in running_state.stdout'
+
+        - name: Reboot RPi
+          reboot:
+            reboot_timeout: 120
+          when: sec_setting_change.changed
+
+    - name: Mount memory cgroups
+      blockinfile:
+        dest: /boot/cmdline.txt
+        marker: "# {mark} ANSIBLE MANAGED ITEM "
+        insertafter: '### This file is managed by Anisble ###'
+        block: >
+          dwc_otg.lpm_enable=0 console=ttyAMA0,115200 console=tty1
+          root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline
+          fsck.repair=yes rootwait quiet loglevel=3 consoleblank=0
+          plymouth.enable=0 cgroup_enable=memory cgroup_memory=1
+        regexp: 'fsck.repair=yes rootwait$'
+        insertafter: 'fsck.repair=yes rootwait'
+        state: present
+      register: memory_cgroups
+
+    - name: Reboot RPi
+      reboot:
+        reboot_timeout: 120
+      when: memory_cgroups.changed
+
+    - name: Wait for the reboot to complete if there was a change.
+      wait_for_connection:
+        connect_timeout: 20
+        sleep: 5
+        delay: 5
+        timeout: 300
+      when: memory_cgroups.changed
+
+    - name: Install needed applications
+      apt:
+        name:
+          - openjdk-8-jdk
+          - nodejs
+          # - java8
+        state: present
+        update_cache: yes
+      when:
+        - '"Debian" in ansible_facts.os_family'
+
+    - name: Create dir(s) (-p)
+      file:
+        path: "{{ item }}"
+        state: directory
+      with_items:
+        - "{{ gg_dependdency_checker_dl_path }}"
+        - "{{ gg_src_dl_path }}"
+
+- name: Greengrass dependency checker
+  block:
+
+    # - name: Download src
+    #   get_url:
+    #     url: https://github.com/aws-samples/aws-greengrass-samples/raw/master/greengrass-dependency-checker-GGCv{{ gg_dependdency_checker_version }}.zip
+    #     dest: "{{ gg_dependdency_checker_dl_path }}/greengrass-dependency-checker-GGCv{{ gg_dependdency_checker_version }}.zip"
+
+    - name: Dwonload and decompress
+      unarchive:
+        src: "https://github.com/aws-samples/aws-greengrass-samples/raw/master/greengrass-dependency-checker-GGCv{{ gg_dependdency_checker_version }}.zip"
+        dest: "{{ gg_dependdency_checker_dl_path }}"
+        remote_src: yes
+
+    # This seems useless right now, there is no output
+    # - name: Modprobe
+    #   shell: modprobe configs
+    #   args:
+    #     chdir: "{{ gg_dependdency_checker_dl_path }}"
+    #   register: modprobe_results
+
+    - name: Record output
+      shell: ./check_ggc_dependencies
+      args:
+        chdir: "{{ gg_dependdency_checker_dl_path }}/greengrass-dependency-checker-GGCv{{ gg_dependdency_checker_version }}"
+      register: output_ggc
+
+- name: Install GG src core
+  block:
+    # - name: Download greengrass src
+    #   get_url:
+    #     url: "{{ gg_src_link }}"
+    #     dest: "{{ gg_src_dl_path }}"
+
+    - name: Decompress GreenGrass Core src
+      unarchive:
+        src: "{{ gg_src_link }}"
+        dest: "{{ gg_src_dl_path }}"
+        remote_src: yes
