@@ -17,7 +17,7 @@ What is the shell user password? REQUIRED for EC2:
 
 Manual testing of aws ec2 computer playbook (for use in SSM):  
 ```
-ansible-playbook -i <IF_OF_HOST>, aws-ec2-maintenance.yml --extra-vars "ansible_user=<WHAT_YOU_SPECIFIED_YOUR_APPUSER> ansible_password=<PASSWORD>"
+ansible-playbook -i 192.168.1.11, onprem-install-ssm.yml -u pi --ask-pass --extra-vars 'ssm_id=b4e5cb07-efa9-464a-bfba-WORD_TO_YOUR_MOTHER code_id=SUPER_SERCRET_STUFF ssm_region=us-east-1'"
 ```
 
 ### TODOs:  
