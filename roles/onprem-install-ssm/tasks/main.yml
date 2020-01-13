@@ -1,0 +1,55 @@
+---
+- name: Check for default raspbian password
+  debug:
+    msg: "Raspian still has the default password!"
+  when:
+    - ansible_ssh_pass == 'raspberry'
+    - '"Debian" in ansible_facts.os_family'
+    - '"arm" in ansible_facts.architecture'
+
+- name: populate service facts
+  service_facts:
+
+- name: Install deb onto RPi
+  block:
+    - name: Install deb package
+      apt:
+        deb: https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_arm/amazon-ssm-agent.deb
+
+  when:
+    - ansible_facts.services['amazon-ssm-agent.service'] is not defined
+    - '"Debian" in ansible_facts.os_family'
+    - '"arm" in ansible_facts.architecture'
+
+- name: Install onto Debian 64 bit host
+  block:
+    - name: Install deb package for Debian 64 bit
+      apt:
+        deb: https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_amd64/amazon-ssm-agent.deb
+
+  when:
+    - ansible_facts.services['amazon-ssm-agent.service'] is not defined
+    - '"Debian" in ansible_facts.os_family'
+    - '"x86_64" in ansible_facts.architecture'
+
+- name: Stop service
+  systemd:
+    name: amazon-ssm-agent
+    state: stopped
+
+- name: Register Machine as hybrid instance
+  shell: amazon-ssm-agent -register -code '{{ code_id }}' -id '{{ ssm_id }}' -region '{{ ssm_region }}'
+  register: registration_output
+
+- name: Start service
+  systemd:
+    name: amazon-ssm-agent
+    state: started
+
+- name: Install ansible
+  apt:
+    name: ansible
+  when:
+    - '"Debian" in ansible_facts.os_family'
+
+  # TODO: Windows
