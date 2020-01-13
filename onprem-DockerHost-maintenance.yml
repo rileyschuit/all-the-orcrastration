@@ -2,8 +2,21 @@
 - name: Package installation and service checks
   hosts: all
   become: True
-  
+
   tasks:
     - name: Run the equivalent of "apt-get update" as a separate step
       apt:
         update_cache: yes
+
+    - name: Minecraft Server
+      docker_container:
+        name: Schuit-Minecraft
+        image: minecraft-bedrock-server
+        restart_policy: unless-stopped
+        volumes:
+          - /home/media-server/minecraft:/data
+        ports:
+         - "19132:19132/udp"
+        env:
+          - GAMEMODE: "creative"
+          - EULA: "TRUE"
