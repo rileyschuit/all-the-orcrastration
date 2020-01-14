@@ -18,5 +18,5 @@
         ports:
          - "19132:19132/udp"
         env:
-          - GAMEMODE: "creative"
-          - EULA: "TRUE"
+          GAMEMODE: "creative"
+          EULA: "TRUE"
