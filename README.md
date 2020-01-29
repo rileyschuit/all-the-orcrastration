@@ -20,6 +20,11 @@ Manual testing of aws ec2 computer playbook (for use in SSM):
 ansible-playbook -i 192.168.1.11, onprem-install-ssm.yml -u pi --ask-pass --extra-vars 'ssm_id=b4e5cb07-efa9-464a-bfba-WORD_TO_YOUR_MOTHER code_id=SUPER_SERCRET_STUFF ssm_region=us-east-1'"
 ```
 
+Example of using local vagrant file
+```
+ansible-playbook -i localhost, playbooks/install_opensprinkler.yml -e ansible_user=vagrant -e ansible_ssh_port=2222 --ask-pass
+```
+
 ### TODOs:  
 - Make better tasks for VPC ACLs
 - Create nuke option for wiping out whole environment

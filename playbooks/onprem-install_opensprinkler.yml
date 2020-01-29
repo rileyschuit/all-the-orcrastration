@@ -1,0 +1,81 @@
+---
+- name: Install opensprinkler
+  hosts: all
+  # remote_user: vagrant
+  become: True
+  gather_facts: False
+
+  pre_tasks:
+    - name: Download roles if we are doing local dev work
+      shell: ansible-galaxy install -r ../roles/requirements.yml -p ../roles/ --force
+      delegate_to: localhost
+      when: lookup('env','USER') != 'awx'
+      run_once: true
+      connection: local
+      become: False
+
+  tasks:
+    - name: Check that OpenSprinkler is not running and install
+      block:
+        - name: Install needed pip packages
+          pip:
+            name: psutil
+
+        - name: Check for process running
+          pids:
+            name: OpenSprinkler
+          register: opensprinkler_pid
+          failed_when: opensprinkler_pid.pids | length > 1
+
+    - name: Include Environment Variables
+      include_role:
+        name: rileyschuit.rpi-opensprinkler
+      when: opensprinkler_pid.pids == 0
+
+  # tasks:
+  #
+  #   - name: Required packages
+  #     apt:
+  #       name:
+  #         - git
+  #         - python3-pip
+  #         - python3-setuptools
+  #       state: present
+  #
+  #   - name: Remove python sylink
+  #     shell: rm /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python
+  #
+  #   - name: Instal pip packages
+  #     pip:
+  #       name:
+  #         - setuptools
+  #         - wheel
+  #         - pexpect
+  #       executable: pip3
+  #   #
+  #   - name: Clone required packages
+  #     git:
+  #       repo: "{{ item.repo }}"
+  #       dest: "{{ item.dest }}"
+  #     with_items:
+  #       - {"repo": "https://github.com/OpenSprinkler/OpenSprinkler-Firmware.git", "dest": "/usr/local/src/opensprinkler"}
+  #
+  #   - name: pids test
+  #     pids:
+  #       name: /usr/local/src/opensprinkler/OpenSprinkler
+  #     register: pid_check
+  #
+  #   # - name: block
+  #   #   when:
+  #   #     - ansible_facts.services['amazon-ssm-agent.opensprinkler'] is not defined
+  #   #   block:
+  #
+  #   - name: Generic question with multiple different responses
+  #     expect:
+  #       command: /usr/local/src/opensprinkler/build.sh
+  #       responses:
+  #         Question:
+  #           - y
+
+    #
+    # # - name:
