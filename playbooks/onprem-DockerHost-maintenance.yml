@@ -106,9 +106,18 @@
         name: "{{ packages }}"
         update_cache: True
 
+    - name: Create a symbolic links
+      file:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest}}"
+        state: link
+        mode: "{{ item.mode }}"
+      with_items: "{{ syms_to_create }}"
+
     - name: install python requirements
       pip:
         name: "{{ pip_packages }}"
+        executable: pip3
 
     - name: Log into DockerHub
       docker_login:
@@ -125,14 +134,6 @@
         state: "{{ item.type }}"
         mode: "{{ item.mode }}"
       with_items: "{{ dirs_to_create }}"
-
-    - name: Create a symbolic links
-      file:
-        src: "{{ item.src }}"
-        dest: "{{ item.dest}}"
-        state: link
-        mode: "{{ item.mode }}"
-      with_items: "{{ syms_to_create }}"
 
     - name: Start up container with env vars
       docker_container:

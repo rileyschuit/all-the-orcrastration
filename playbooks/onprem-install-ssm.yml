@@ -21,5 +21,5 @@
       private: no
       when: ssm_region is not defined
 
-roles:
-  - onprem-install-ssm
+  roles:
+    - onprem-install-ssm

@@ -51,5 +51,3 @@
     name: ansible
   when:
     - '"Debian" in ansible_facts.os_family'
-
-  # TODO: Windows
