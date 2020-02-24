@@ -2,16 +2,34 @@
 - name: Package installation and service checks
   hosts: all
   become: True
+  gather_facts: True
 
-  tasks:
-    - name: Run the equivalent of "apt-get update" as a separate step
-      apt:
-        update_cache: yes
-
-    - name: Minecraft Server
-      docker_container:
-        name: Schuit-Minecraft
-        image: minecraft-bedrock-server
+  vars:
+    packages:
+      - jq
+      - python3-pip
+      - python3-apt 
+    pip_packages:
+      - docker-py
+    container_details:
+      schuit-couchpotato:
+        image: timhaak/couchpotato
+        ports:
+          - "8282:5050/tcp"
+        volumes:
+          - /etc/localtime:/etc/localtime
+          - /home/media-server/couchpotato/config:/config
+          - /home/SHARE:/data
+        restart_policy: unless-stopped
+      schuit-homeassistant:
+         image: homeassistant/home-assistant
+         ports:
+           - "8123:8123/tcp"
+         volumes:
+           - /home/media-server/hass:/config
+         restart_policy: unless-stopped
+      schuit-minecraft:
+        image: itzg/minecraft-bedrock-server
         restart_policy: unless-stopped
         volumes:
           - /home/media-server/minecraft:/data
@@ -20,3 +38,119 @@
         env:
           GAMEMODE: "creative"
           EULA: "TRUE"
+      schuit-pihole:
+        image: pihole/pihole
+        restart_policy: unless-stopped
+        volumes:
+          - /home/media-server/pi-hole:/etc/pihole
+          - /home/media-server/pi-hole-dnsmasq:/etc/dnsmasq.d
+        ports:
+         - "53:53/udp"
+         - "53:53/tcp"
+         - "67:67/udp"
+         - "80:80/tcp"
+      schuit-plex:
+        image: plexinc/pms-docker
+        ports:
+          - "32400:32400/tcp"
+        volumes:
+          - /home/media-server/plex:/config
+          - /home/SHARE:/data
+        restart_policy: unless-stopped
+        env:
+          TZ: "America/Vancouver"
+        pull: True
+      schuit-sabnzbd:
+        image: timhaak/sabnzbd
+        ports:
+          - "8080:8080/tcp"
+        volumes:
+          - /etc/localtime:/etc/localtime
+          - /home/SHARE:/data
+          - /home/media-server/sabnzbdplus/config:/config
+        restart_policy: unless-stopped
+      schuit-sonarr:
+        image: linuxserver/sonarr
+        ports:
+          - "8181:8989/tcp"
+        volumes:
+          - /etc/localtime:/etc/localtime
+          - /home/media-server/sonarr/config:/config
+          - /home/media-server/sonarr/data:/data
+          - /home/SHARE/Downloads/downloaded-files:/downloads
+          - /home/SHARE/Video/TV_Shows:/tv
+        restart_policy: unless-stopped
+      schuit-transmission:
+         image: linuxserver/transmission
+         ports:
+           - "8383:9091/tcp"
+         volumes:
+           - /home/media-server/transmission:/config
+           - /home/SHARE/Torrent/downloads:/downloads
+           - /home/SHARE/Torrent/watch:/watch
+         restart_policy: unless-stopped
+
+  tasks:
+    - name: install apt requirements
+      apt:
+        name: "{{ packages }}"
+        update_cache: True
+
+    - name: install python requirements
+      pip:
+        name: "{{ pip_packages }}"
+
+    - name: Log into DockerHub
+      docker_login:
+        username: "{{ docker_user }}"
+        password: "{{ docker_pw }}"
+      register: docker_hub_login_attempt
+      when:
+        - docker_user is defined
+        - docker_pw is defined
+
+    - name: Create needed file structure
+      file:
+        path: "{{ item.path }}"
+        state: "{{ item.type }}"
+        mode: "{{ item.mode }}"
+      with_items:
+        - {'path': '/home/media-server/couchpotato', 'type': 'directory','mode': '755'}
+        - {'path': '/home/media-server/minecraft', 'type': 'directory', 'mode': '755'}
+        - {'path': '/home/media-server/pi-hole', 'type': 'directory','mode': '755'}
+        - {'path': '/home/media-server/pi-hole-dnsmasq', 'type': 'directory','mode': '755'}
+        - {'path': '/home/media-server/plex', 'type': 'directory','mode': '755'}
+        - {'path': '/home/media-server/sabnzbdplus', 'type': 'directory','mode': '755'}
+        - {'path': '/home/media-server/sonarr', 'type': 'directory','mode': '755'}
+
+    - name: Create a symbolic links
+      file:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest}}"
+        state: link
+        mode: "{{ item.mode }}"
+      with_items:
+        - {'src': '/usr/bin/python3', 'dest': '/usr/bin/python', 'type': 'symlink','mode': '755'}
+
+    - name: Start up container with env vars
+      docker_container:
+        name: "{{ item.key }}"
+        image: "{{ item.value.image }}"
+        restart_policy: "{{ item.value.restart_policy | default('unless-stopped') }}"
+        volumes: "{{ item.value.volumes }}"
+        ports: "{{ item.value.ports }}"
+        env: "{{ item.value.env | default('')}}"
+        pull: "{{ item.value.pull | default('no')}}"
+      when: item.value.env is defined
+      with_dict: "{{ container_details }}"
+
+    - name: Start up container without env vars
+      docker_container:
+        name: "{{ item.key }}"
+        image: "{{ item.value.image }}"
+        restart_policy: "{{ item.value.restart_policy}}"
+        volumes: "{{ item.value.volumes }}"
+        ports: "{{ item.value.ports }}"
+        pull: "{{ item.value.pull | default('no')}}"
+      when: item.value.env is not defined
+      with_dict: "{{ container_details }}"
