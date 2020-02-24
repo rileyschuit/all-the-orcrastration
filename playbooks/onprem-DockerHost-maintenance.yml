@@ -5,10 +5,21 @@
   gather_facts: True
 
   vars:
+    dirs_to_create:
+      - {'path': '/home/media-server/couchpotato', 'type': 'directory','mode': '755'}
+      - {'path': '/home/media-server/hass', 'type': 'directory','mode': '755'}
+      - {'path': '/home/media-server/minecraft-bedrock', 'type': 'directory', 'mode': '755'}
+      - {'path': '/home/media-server/pi-hole', 'type': 'directory','mode': '755'}
+      - {'path': '/home/media-server/pi-hole-dnsmasq', 'type': 'directory','mode': '755'}
+      - {'path': '/home/media-server/plex', 'type': 'directory','mode': '755'}
+      - {'path': '/home/media-server/sabnzbdplus', 'type': 'directory','mode': '755'}
+      - {'path': '/home/media-server/sonarr', 'type': 'directory','mode': '755'}
+    syms_to_create:
+      - {'src': '/usr/bin/python3', 'dest': '/usr/bin/python', 'type': 'symlink','mode': '755'}
     packages:
       - jq
       - python3-pip
-      - python3-apt 
+      - python3-apt
     pip_packages:
       - docker-py
     container_details:
@@ -22,12 +33,11 @@
           - /home/SHARE:/data
         restart_policy: unless-stopped
       schuit-homeassistant:
-         image: homeassistant/home-assistant
-         ports:
-           - "8123:8123/tcp"
-         volumes:
-           - /home/media-server/hass:/config
-         restart_policy: unless-stopped
+        image: homeassistant/home-assistant:stable
+        volumes:
+          - /home/media-server/hass:/config
+        restart_policy: unless-stopped
+        network_mode: host
       schuit-minecraft:
         image: itzg/minecraft-bedrock-server
         restart_policy: unless-stopped
@@ -114,14 +124,7 @@
         path: "{{ item.path }}"
         state: "{{ item.type }}"
         mode: "{{ item.mode }}"
-      with_items:
-        - {'path': '/home/media-server/couchpotato', 'type': 'directory','mode': '755'}
-        - {'path': '/home/media-server/minecraft', 'type': 'directory', 'mode': '755'}
-        - {'path': '/home/media-server/pi-hole', 'type': 'directory','mode': '755'}
-        - {'path': '/home/media-server/pi-hole-dnsmasq', 'type': 'directory','mode': '755'}
-        - {'path': '/home/media-server/plex', 'type': 'directory','mode': '755'}
-        - {'path': '/home/media-server/sabnzbdplus', 'type': 'directory','mode': '755'}
-        - {'path': '/home/media-server/sonarr', 'type': 'directory','mode': '755'}
+      with_items: "{{ dirs_to_create }}"
 
     - name: Create a symbolic links
       file:
@@ -129,8 +132,7 @@
         dest: "{{ item.dest}}"
         state: link
         mode: "{{ item.mode }}"
-      with_items:
-        - {'src': '/usr/bin/python3', 'dest': '/usr/bin/python', 'type': 'symlink','mode': '755'}
+      with_items: "{{ syms_to_create }}"
 
     - name: Start up container with env vars
       docker_container:
@@ -141,7 +143,9 @@
         ports: "{{ item.value.ports }}"
         env: "{{ item.value.env | default('')}}"
         pull: "{{ item.value.pull | default('no')}}"
-      when: item.value.env is defined
+      when:
+        - item.value.env is defined
+        - item.value.network_mode is not defined
       with_dict: "{{ container_details }}"
 
     - name: Start up container without env vars
@@ -152,5 +156,18 @@
         volumes: "{{ item.value.volumes }}"
         ports: "{{ item.value.ports }}"
         pull: "{{ item.value.pull | default('no')}}"
-      when: item.value.env is not defined
+      when:
+        - item.value.env is not defined
+        - item.value.network_mode is not defined
+      with_dict: "{{ container_details }}"
+
+    - name: Configure container for host networking
+      docker_container:
+        name: "{{ item.key }}"
+        image: "{{ item.value.image }}"
+        volumes: "{{ item.value.volumes }}"
+        restart_policy: unless-stopped
+        network_mode: "{{ item.value.network_mode }}"
+      when:
+        - item.value.network_mode is defined
       with_dict: "{{ container_details }}"
