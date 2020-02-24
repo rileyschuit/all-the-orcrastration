@@ -1,9 +1,21 @@
 ---
 - name: Install opensprinkler
   hosts: all
-  # remote_user: vagrant
+  # Usually installed on a Rpi, defaults to user 'pi'
+  remote_user: "{{ remote_user | default('pi') }}"
   become: True
   gather_facts: False
+
+  vars:
+    syms_to_create:
+      - {'src': '/usr/bin/python3', 'dest': '/usr/bin/python', 'type': 'symlink','mode': '755'}
+    packages:
+      - git
+      - jq
+      - python3
+      - python3-pip
+      - python3-apt
+      - python3-setuptools
 
   pre_tasks:
     - name: Download roles if we are doing local dev work
@@ -17,9 +29,18 @@
   tasks:
     - name: Check that OpenSprinkler is not running and install
       block:
-        - name: Install needed pip packages
-          pip:
-            name: psutil
+        - name: Install required packages
+          package:
+             name: "{{ packages }}"
+             state: latest
+
+        - name: Create a symbolic links
+          file:
+            src: "{{ item.src }}"
+            dest: "{{ item.dest}}"
+            state: link
+            mode: "{{ item.mode }}"
+          with_items: "{{ syms_to_create }}"
 
         - name: Check for process running
           pids:
@@ -27,23 +48,17 @@
           register: opensprinkler_pid
           failed_when: opensprinkler_pid.pids | length > 1
 
-    - name: Include Environment Variables
+    - name: Include Installation role
       include_role:
         name: rileyschuit.rpi-opensprinkler
       when: opensprinkler_pid.pids == 0
 
   # tasks:
-  #
   #   - name: Required packages
   #     apt:
-  #       name:
-  #         - git
-  #         - python3-pip
-  #         - python3-setuptools
+  #       name: "{{ packages }}"
   #       state: present
   #
-  #   - name: Remove python sylink
-  #     shell: rm /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python
   #
   #   - name: Instal pip packages
   #     pip:
@@ -52,30 +67,30 @@
   #         - wheel
   #         - pexpect
   #       executable: pip3
-  #   #
+  #
   #   - name: Clone required packages
   #     git:
   #       repo: "{{ item.repo }}"
   #       dest: "{{ item.dest }}"
   #     with_items:
-  #       - {"repo": "https://github.com/OpenSprinkler/OpenSprinkler-Firmware.git", "dest": "/usr/local/src/opensprinkler"}
+  #       - { "repo": "https://github.com/OpenSprinkler/OpenSprinkler-Firmware.git", "dest": "/usr/local/src/opensprinkler"}
   #
-  #   - name: pids test
+  #   - name: Check for the pid
   #     pids:
   #       name: /usr/local/src/opensprinkler/OpenSprinkler
   #     register: pid_check
   #
-  #   # - name: block
-  #   #   when:
-  #   #     - ansible_facts.services['amazon-ssm-agent.opensprinkler'] is not defined
-  #   #   block:
-  #
-  #   - name: Generic question with multiple different responses
-  #     expect:
-  #       command: /usr/local/src/opensprinkler/build.sh
-  #       responses:
-  #         Question:
-  #           - y
+  #   - name: debug
+  #     debug:
+  #       msg: "{{ pid_check }}"
 
-    #
-    # # - name:
+      # - name: block
+      #   when:
+      #     - ansible_facts.services['opensprinkler'] is not defined
+      #   block:
+      #     - name: Generic question with multiple different responses
+      #       expect:
+      #         command: /usr/local/src/opensprinkler/build.sh
+      #         responses:
+      #           Question:
+      #             - y
