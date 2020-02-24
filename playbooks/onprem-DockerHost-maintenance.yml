@@ -21,6 +21,7 @@
       - python3-pip
       - python3-apt
     pip_packages:
+      # - ansible
       - docker-py
     container_details:
       schuit-couchpotato:
@@ -42,7 +43,7 @@
         image: itzg/minecraft-bedrock-server
         restart_policy: unless-stopped
         volumes:
-          - /home/media-server/minecraft:/data
+          - /home/media-server/minecraft-bedrock:/data
         ports:
          - "19132:19132/udp"
         env:
