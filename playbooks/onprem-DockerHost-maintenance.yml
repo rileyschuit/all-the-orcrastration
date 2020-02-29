@@ -62,14 +62,11 @@
          - "80:80/tcp"
       schuit-plex:
         image: plexinc/pms-docker
-        ports:
-          - "32400:32400/tcp"
+        network_mode: host
         volumes:
           - /home/media-server/plex:/config
           - /home/SHARE:/data
         restart_policy: unless-stopped
-        env:
-          TZ: "America/Vancouver"
         pull: True
       schuit-sabnzbd:
         image: timhaak/sabnzbd
@@ -106,6 +103,11 @@
       apt:
         name: "{{ packages }}"
         update_cache: True
+
+    - name: removing known apt repo providing lovely issues
+      apt_repository:
+        repo: http://ppa.launchpad.net/iconnor/zoneminder/ubuntu/dists/xenial/main/binary-amd64/Packages xenial main
+        state: absent
 
     - name: Create a symbolic links
       file:
