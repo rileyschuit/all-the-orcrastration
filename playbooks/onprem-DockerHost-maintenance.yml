@@ -4,6 +4,15 @@
   become: True
   gather_facts: True
 
+  pre_tasks:
+    - name: Download roles if we are doing local dev work
+      shell: ansible-galaxy install -r ../roles/requirements.yml -p ../roles/ --force
+      delegate_to: localhost
+      when: lookup('env','USER') != 'awx'
+      run_once: true
+      connection: local
+      become: False
+
   vars:
     dirs_to_create:
       - {'path': '/home/media-server/couchpotato', 'type': 'directory','mode': '755'}
