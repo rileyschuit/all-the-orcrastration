@@ -2,22 +2,39 @@
 - name: AWS Environment Creation
   hosts: localhost
   gather_facts: False
-  vars_prompt:
-    - name: appuser
-      prompt: "What is the shell username you want"
-      private: no
-      when: appuser is not defined
 
-    - name: appuser_pw
-      prompt: "What is the shell user password? REQUIRED for EC2"
-      private: yes
-      when: appuser_pw is not defined
+  pre_tasks:
+    - name: Download roles if we are doing local dev work
+      shell: ansible-galaxy install -r roles/requirements.yml -p ./roles/ --force
+      delegate_to: localhost
+      when: lookup('env','USER') != 'awx'
+      run_once: true
+      connection: local
+      become: False
 
-  roles:
-    - provision-vpc
-    - provision-s3
-    - provision-iam
-    - role: provision-ec2
-      when:
-        - appuser != ''
-        - appuser_pw != ''
+  # vars_prompt:
+  #   - name: appuser
+  #     prompt: "What is the shell username you want"
+  #     private: no
+  #     when: appuser is not defined
+  #
+  #   - name: appuser_pw
+  #     prompt: "What is the shell user password? REQUIRED for EC2"
+  #     private: yes
+  #     when: appuser_pw is not defined
+
+  tasks:
+    - name: BLOCK - IMPORT PROVISION ROLES
+      connection: local
+      block:
+        - include_role:
+            name: provision-aws-iam
+        # - include_role:
+        #     name: provision-s3
+        - include_role:
+            name: provision-aws-vpc
+        # - include_role:
+        #     name: provision-aws-ec2
+          # when:
+          #   - appuser != ''
+          #   - appuser_pw != ''
