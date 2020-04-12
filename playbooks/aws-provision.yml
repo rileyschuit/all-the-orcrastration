@@ -29,8 +29,10 @@
       block:
         - include_role:
             name: provision-aws-iam
-        # - include_role:
-        #     name: provision-s3
+        - include_role:
+            name: provision-aws-s3
+          tags:
+            - s3
         - include_role:
             name: provision-aws-vpc
         # - include_role:

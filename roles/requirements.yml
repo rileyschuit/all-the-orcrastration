@@ -1,0 +1,12 @@
+---
+- src: https://github.com/rileyschuit/provision-aws-vpc.git
+  version: master
+  name: provision-aws-vpc
+
+- src: https://github.com/rileyschuit/provision-aws-iam.git
+  version: master
+  name: provision-aws-iam
+
+- src: https://github.com/rileyschuit/provision-aws-s3.git
+  version: master
+  name: provision-aws-s3
