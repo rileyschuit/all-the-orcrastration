@@ -1,20 +1,78 @@
 ---
-- name: Package installation and service checks
+- name: On Prem RPi requirements
   hosts: all
   remote_user: pi
   become: True
   gather_facts: True
+  vars:
+    required_services:
+      - zabbix-agent
+    required_repos:
+      - {
+          'url': 'https://repo.zabbix.com/zabbix/4.4/raspbian/pool/main/z/zabbix-release/zabbix-release_4.4-1+buster_all.deb',
+          'dest': '/tmp/zabbix-release_4.4-1+buster_all.deb'
+        }
 
-  pre_tasks:
-    - name: Download roles if we are doing local dev work
-      shell: ansible-galaxy install -r roles/requirements.yml -p ./roles/ --force
-      delegate_to: localhost
-      when: lookup('env','USER') != 'awx'
-      run_once: true
-      connection: local
-      become: False      
+  # NOT NEEDED YET
+  # pre_tasks:
+  #   - name: Download roles if we are doing local dev work
+  #     shell: ansible-galaxy install -r ../roles/requirements.yml -p ../roles/ --force
+  #     delegate_to: localhost
+  #     when: lookup('env','USER') != 'awx'
+  #     run_once: true
+  #     connection: local
+  #     become: False
 
-  # tasks:
-  #   - name: Install Greengrass
-  #     include_role:
-  #       name: on-prem-rpi-install-greengrass
+  tasks:
+    - name: BLOCK - check if service is running and then install agent if needed
+      block:
+        - name: Enable service
+          service:
+            name: "{{ item }}"
+            state: started
+          with_items: "{{ required_services }}"
+
+      rescue:
+        - name: Download zabbix agent repo
+          uri:
+            url: "{{ item.url }}"
+            dest: "{{ item.dest }}"
+          with_items: "{{ required_repos }}"
+
+        - name: Install zabbix agent
+          apt:
+            deb: "{{ item.dest }}"
+          with_items: "{{ required_repos }}"
+
+        - name: Run the equivalent of "apt-get update" as a separate step
+          apt:
+            update_cache: yes
+
+        - name: Install services
+          apt:
+            name: "{{ required_services }}"
+
+        - name: Enable service
+          service:
+            name: "{{ item }}"
+            state: started
+          with_items: "{{ required_services }}"
+
+        - name: Remove files
+          file:
+            path: "{{ item.dest }}"
+          with_items: "{{ required_repos }}"
+
+    - name: Configure zabbix server address for client
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: 'Server='
+        line: Server={{ zabbix_server_address }}
+      # when: zabbix_server_address is defined
+      register: agentd_conf
+
+    - name: Restart service if configuration has changed
+      service:
+        name: zabbix-agent
+        state: restarted
+      when: agentd_conf.changed

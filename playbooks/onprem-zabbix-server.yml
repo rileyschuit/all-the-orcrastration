@@ -1,0 +1,76 @@
+---
+- name: Bring up all services needed for zabbix
+  hosts: all
+  remote_user: rileyschuit
+  gather_facts: False
+  # become: True
+  vars:
+    # zabbix_postgress_db_user: "schuit"
+    # zabbix_postgress_db_pw: Dragon1026
+    storage_prefix: '/home/media-server/schuit'
+    container_prefix: 'schuit'
+
+    docker_containers:
+      zabbix_postgres_storage:
+          name: "{{ container_prefix }}_zabbix_postgres_storage"
+          image: "postgres:12.2-alpine"
+          volumes:
+            - "{{ storage_prefix }}_zabbix_postgres_storage:/var/lib/postgresql/data"
+          env:
+            POSTGRES_USER: "{{ zabbix_postgress_db_user }}"
+            POSTGRES_PASSWORD: "{{ zabbix_postgress_db_pw }}"
+            POSTGRES_DB: "{{ zabbix_postgress_db_user }}" # defaults to POSTGRES_USER
+      zabbix_snmptraps:
+          name: "{{ container_prefix }}_zabbix_snmptraps"
+          image: "zabbix/zabbix-snmptraps:alpine-4.4-latest"
+          volumes:
+            - "{{ storage_prefix }}_zabbix_snmptraps:/var/lib/zabbix/snmptraps"
+            - "{{ storage_prefix }}_zabbix_mibs:/usr/share/snmp/mibs"
+          ports:
+            - "162:162/udp"
+      zabbix_server:
+          name: "{{ container_prefix }}_zabbix_server"
+          image: "zabbix/zabbix-server-pgsql:alpine-4.4-latest"
+          links:
+            - schuit_zabbix_postgres_storage:zabbixserverpostgres
+          ports:
+            - "10050:10050"
+            - "10051:10051"
+          volumes:
+            - "{{ storage_prefix }}_zabbix_mibs:/var/lib/zabbix/mibs"
+            - "{{ storage_prefix }}_zabbix_externalscripts:/usr/lib/zabbix/externalscripts"
+          env:
+            DB_SERVER_HOST: zabbixserverpostgres
+            POSTGRES_DB: "{{ zabbix_postgress_db_user }}"
+            POSTGRES_USER: "{{ zabbix_postgress_db_user }}"
+            POSTGRES_PASSWORD: "{{ zabbix_postgress_db_pw }}"
+      zabbix_ui:
+          name: "{{ container_prefix }}_zabbix_ui"
+          image: "zabbix/zabbix-web-nginx-pgsql"
+          links:
+            - schuit_zabbix_server:zabbixserver
+            - schuit_zabbix_postgres_storage:zabbixserverpostgres
+          ports:
+            - "8888:80"
+          env:
+            DB_SERVER_HOST: "zabbixserverpostgres"
+            POSTGRES_DB: "{{ zabbix_postgress_db_user }}"
+            POSTGRES_USER: "{{ zabbix_postgress_db_user }}"
+            POSTGRES_PASSWORD: "{{ zabbix_postgress_db_pw }}"
+            ZBX_SERVER_HOST: "zabbixserver"
+            PHP_TZ: "America/Vancouver"
+            ZBX_SERVER_NAME: "Schuit Docker"
+
+  tasks:
+    - name: Start up our containers
+      docker_container:
+        name: "{{ item.value.name }}"
+        image: "{{ item.value.image }}"
+        state: started
+        restart: yes
+        restart_policy: "{{item.value.restart_policy | default('on-failure')}}"
+        volumes: "{{ item.value.volumes | default([]) }}"
+        ports: "{{ item.value.ports | default([]) }}"
+        links: "{{ item.value.links | default([]) }}"
+        env: "{{ item.value.env | default({})}}"
+      with_dict: "{{ docker_containers }}"
