@@ -1,0 +1,20 @@
+---
+- name: Install octoprint service and optionally monitor it
+  hosts: all
+  remote_user: pi
+  become: True
+  gather_facts: True
+  vars:
+    octoprint_port: 80
+
+  pre_tasks:
+    - name: Download roles if we are doing local dev work
+      shell: ansible-galaxy install -p ../roles/ semuadmin.octoprint
+      delegate_to: localhost
+      when: lookup('env','USER') != 'awx'
+      run_once: true
+      connection: local
+      become: False
+
+  roles:
+    - semuadmin.octoprint
