@@ -10,3 +10,7 @@
 - src: https://github.com/rileyschuit/provision-aws-s3.git
   version: master
   name: provision-aws-s3
+
+- src: semuadmin.octoprint
+
+- src: rileyschuit.rpi-opensprinkler

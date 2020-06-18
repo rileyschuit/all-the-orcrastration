@@ -3,3 +3,4 @@ roles/rileyschuit.rpi-opensprinkler
 roles/provision-aws-iam
 roles/provision-aws-vpc
 roles/provision-aws-s3
+roles/semuadmin.octoprint
