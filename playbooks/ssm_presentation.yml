@@ -3,12 +3,6 @@
   hosts: all
 
   tasks:
-    - name: Have a simple nginx server going
-      apt:
-        name: nginx
-        state: latest
-        update_cache: yes
-
     - name: Upgrade all packages to the latest version
       apt:
         name: "*"
